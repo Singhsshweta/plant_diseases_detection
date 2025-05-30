@@ -1,38 +1,64 @@
+# scripts/train_model.py
+
+import sys
 import os
-import argparse
-import shutil
-from sklearn.model_selection import train_test_split
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from models.base_model import build_model
 
-def split_dataset(input_dir, output_dir, train_ratio=0.7, valid_ratio=0.2, test_ratio=0.1):
-    subdirs = ['train', 'valid', 'test']
-    for subdir in subdirs:
-        os.makedirs(os.path.join(output_dir, subdir), exist_ok=True)
+DATA_DIR = "data/processed"
+TRAIN_DIR = os.path.join(DATA_DIR, "train")
+VAL_DIR = os.path.join(DATA_DIR, "val")
+MODEL_SAVE_PATH = "models/trained_model.h5"
 
-    for class_name in os.listdir(input_dir):
-        class_path = os.path.join(input_dir, class_name)
-        if os.path.isdir(class_path):
-            images = [f for f in os.listdir(class_path) if os.path.isfile(os.path.join(class_path, f))]
-            if not images:
-                print(f"Skipping empty class: {class_name}")
-                continue
+IMG_SIZE = (128, 128)
+BATCH_SIZE = 32
+EPOCHS = 15  # increase epochs to benefit from augmentation
 
-            train_imgs, temp_imgs = train_test_split(images, train_size=train_ratio, random_state=42)
-            valid_imgs, test_imgs = train_test_split(temp_imgs, test_size=test_ratio / (valid_ratio + test_ratio), random_state=42)
+def train():
+    print("Preparing data generators with augmentation...")
 
-            for subset, subset_imgs in zip(subdirs, [train_imgs, valid_imgs, test_imgs]):
-                output_path = os.path.join(output_dir, subset, class_name)
-                os.makedirs(output_path, exist_ok=True)
-                for img in subset_imgs:
-                    shutil.copy(os.path.join(class_path, img), os.path.join(output_path, img))
-            print(f"{class_name}: {len(train_imgs)} train, {len(valid_imgs)} valid, {len(test_imgs)} test")
+    train_datagen = ImageDataGenerator(
+        rescale=1./255,
+        rotation_range=20,
+        zoom_range=0.15,
+        width_shift_range=0.2,
+        height_shift_range=0.2,
+        shear_range=0.15,
+        horizontal_flip=True,
+        fill_mode="nearest"
+    )
 
-def main():
-    parser = argparse.ArgumentParser(description="Split dataset into train/valid/test folders.")
-    parser.add_argument("input_dir", help="Path to input dataset folder")
-    parser.add_argument("output_dir", help="Path to save processed dataset")
-    args = parser.parse_args()
+    val_datagen = ImageDataGenerator(rescale=1./255)
 
-    split_dataset(args.input_dir, args.output_dir)
+    train_generator = train_datagen.flow_from_directory(
+        TRAIN_DIR,
+        target_size=IMG_SIZE,
+        batch_size=BATCH_SIZE,
+        class_mode='categorical'
+    )
+
+    val_generator = val_datagen.flow_from_directory(
+        VAL_DIR,
+        target_size=IMG_SIZE,
+        batch_size=BATCH_SIZE,
+        class_mode='categorical'
+    )
+
+    print("Building model...")
+    model = build_model(input_shape=(128, 128, 3), num_classes=len(train_generator.class_indices))
+
+    print("Starting training...")
+    model.fit(
+        train_generator,
+        epochs=EPOCHS,
+        validation_data=val_generator
+    )
+
+    print(f"Saving trained model to {MODEL_SAVE_PATH}...")
+    model.save(MODEL_SAVE_PATH)
+
+    print("Training complete.")
 
 if __name__ == "__main__":
-    main()
+    train()

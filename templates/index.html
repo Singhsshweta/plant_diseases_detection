@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+  <title>Plant Disease Classifier Demo</title>
+</head>
+<body>
+  <h1>Upload a Plant Leaf Image</h1>
+  {% if message %}
+    <p style="color:red;">{{ message }}</p>
+  {% endif %}
+  <form method=post enctype=multipart/form-data>
+    <input type=file name=file>
+    <input type=submit value='Predict'>
+  </form>
+
+  {% if label %}
+    <h2>Prediction:</h2>
+    <p>Class: <b>{{ label }}</b></p>
+    <p>Confidence: <b>{{ '%.2f'|format(confidence * 100) }}%</b></p>
+    <img src="{{ url_for('static', filename='uploads/' + filename) }}" alt="Uploaded Image" width="300">
+  {% endif %}
+</body>
+</html>

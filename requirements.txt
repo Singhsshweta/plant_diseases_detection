@@ -1,2 +1,4 @@
+tensorflow==2.18.1
+numpy
 scikit-learn
-
+flask
